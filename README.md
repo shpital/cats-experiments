@@ -1,2 +1,2 @@
 # cats-experiments
-Это своего рода рабочая тетрадь, которую я веду в процессе более подробного изучения замечательных библиотек Cats
+This is kind of a workbook that I keep as I explore the great Cats libraries in more detail.
