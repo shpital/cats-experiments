@@ -1,0 +1,127 @@
+**Классы типов** (Type Classes) - это шаблон программирования, происходящий из `Haskell`.
+Они позволяют нам расширять существующие библиотеки новыми функциональными возможностями,
+не используя традиционное наследование и не изменяя исходный код библиотеки.
+
+Шаблон класса типа состоит из трех важных компонентов:
+*    самого класса типа,
+*    экземпляров для определенных типов и
+*    методов, использующих классы типов.
+
+Классы типов в Scala реализуются с использованием 
+* неявных значений (`implicit values`) и 
+* параметров (`implicit parameters`),
+* а также опционально с использованием неявных классов (`implicit classes`).
+
+Конструкции языка Scala соответствуют компонентам классов типов следующим образом:
+*    traits: type classes;
+*    implicit values: type class instances;
+*    implicit parameters: type class use; and
+*    implicit classes: optional utilities that make type classes easier to use.
+
+**The Type Class**
+
+Класс типа - это интерфейс или API, который представляет некоторую функциональность, 
+которую мы хотим реализовать.
+
+В Scala класс типа представлен `trait` с хотя бы одним параметром типа.
+
+     trait JsonWriter[A] {
+        def write(value: A): Json
+     }
+
+**Type Class Instances**
+
+Экземпляры класса type предоставляют реализации класса type для конкретных типов, 
+которые нас интересуют, которые могут включать типы из стандартной библиотеки `Scala` 
+и типы из нашей модели предметной области.
+
+В Scala мы определяем экземпляры, создавая конкретные реализации класса типа и 
+помечая их ключевым словом `implicit` :
+
+    implicit val stringWriter: JsonWriter[String] = new JsonWriter[String] {
+      def write(value: String): Json = JsString(value)
+    }
+
+**Type Class Use**
+
+Использование класса типа - это любая функциональность, для работы которой требуется 
+экземпляр класса типа. 
+В `Scala` это означает любой метод, который принимает экземпляры класса type в качестве
+неявных параметров.
+
+`Cats` предоставляет утилиты, которые упрощают использование классов типов,
+и иногда вы увидите эти шаблоны в других библиотеках.
+Есть два способа сделать это: 
+*    Объекты интерфейса(`Interface Objects`) и 
+*    синтаксис интерфейса(`Interface Syntax`).
+
+_**Interface Objects**_
+
+Самый простой способ создания интерфейса, использующего класс типа, - это поместить 
+методы в одноэлементный объект:
+
+      object Json {
+        def toJson[A](value: A)(implicit w: JsonWriter[A]): Json = w.write(value)
+      }
+
+Чтобы использовать этот объект, мы импортируем любые экземпляры класса типа, которые нас интересуют, 
+и вызываем соответствующий метод:
+
+import JsonWriterInstances._
+
+    Json.toJson(Person("Dave", "dave@example.com"))
+    // res1: Json = JsObject(
+    //   Map("name" -> JsString("Dave"), "email" -> JsString("dave@example.com"))
+    // )
+
+Компилятор обнаруживает, что мы вызвали метод `toJson` без предоставления неявных параметров.
+Он пытается исправить это путем поиска экземпляров класса типов соответствующих
+типов и вставки их подстановки:
+
+    Json.toJson(Person("Dave", "dave@example.com"))(personWriter)
+
+
+_**Interface Syntax**_
+
+В качестве альтернативы, мы можем использовать методы расширения для расширения существующих 
+типов с помощью интерфейсных методов. `Cats` называет это “синтаксисом” для `type class`:
+
+    object JsonSyntax {
+        implicit class JsonWriterOps[A](value: A) {
+            def toJson(implicit w: JsonWriter[A]): Json = w.write(value)
+        }
+    }
+
+Мы используем синтаксис интерфейса, импортируя его вместе с экземплярами для нужных нам типов:
+
+    import JsonWriterInstances._
+    import JsonSyntax._
+    
+    Person("Dave", "dave@example.com").toJson
+    // res3: Json = JsObject(
+    //   Map("name" -> JsString("Dave"), "email" -> JsString("dave@example.com"))
+    // )
+
+Опять же, компилятор ищет кандидатов для неявных параметров и заполняет их для нас:
+
+    Person("Dave", "dave@example.com").toJson(personWriter)
+
+_**The implicitly Method**_
+
+Стандартная библиотека Scala предоставляет интерфейс класса универсального типа, вызываемый `implicitly`. 
+Его определение очень простое:
+    
+    def implicitly[A](implicit value: A): A = value
+
+Мы можем использовать `implicitly` для вызова любого значения из неявной области видимости(`implicit scope`). 
+Мы предоставляем тот тип, который нам нужен, и `implicitly` делаем все остальное:
+
+    import JsonWriterInstances._
+    
+    implicitly[JsonWriter[String]]
+    // res5: JsonWriter[String] = repl.Session$App0$JsonWriterInstances$$anon$1@76f60d45
+
+Большинство классов типов в `Cats` предоставляют другие средства для вызова экземпляров. 
+Тем не менее, `implicitly` это хороший запасной вариант для целей отладки. 
+Мы можем вставить вызов `implicitly` в общий поток нашего кода, чтобы компилятор мог найти экземпляр 
+класса типа и убедиться в отсутствии неоднозначных неявных ошибок.
