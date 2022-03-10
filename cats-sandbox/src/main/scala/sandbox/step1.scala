@@ -92,4 +92,15 @@ object step1 extends App {
 
   implicitly[JsonWriter[String]]
   // res5: JsonWriter[String] = repl.Session$App0$JsonWriterInstances$$anon$1@76f60d45
+
+  /**
+   * Recursive Implicit Resolution
+   */
+
+  implicit def optionWriter[A](implicit writer: JsonWriter[A]): JsonWriter[Option[A]] = new JsonWriter[Option[A]] {
+    def write(option: Option[A]): Json = option match {
+      case Some(aValue) => writer.write(aValue)
+      case None => JsNull
+    }
+  }
 }
